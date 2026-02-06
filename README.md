@@ -26,7 +26,7 @@ Once the scan is complete, the system calculates a "Biological Age" based on cra
 
 ## 📦 How to Run
 
-Host it to github pages OR any static pages demo is located [here](https://starlightgg.github.io/face-scan).
+Host it to github pages OR any static pages. Demo is located [here](https://starlightgg.github.io/face-scan).
 
 ### Option 1: VS Code (Recommended)
 1.  Open the project folder in **VS Code**.
