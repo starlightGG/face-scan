@@ -274,7 +274,7 @@
             <div id="confidence-display">CONFIDENCE: CALCULATING...</div>
         </div>
 
-        <button class="btn" onclick="generateID()">GENERATE ID CARD</button>
+        <button id="gen-btn" class="btn" onclick="generateID()">GENERATE ID CARD</button>
         <button class="btn" style="border-color: #555; color: #777; margin-top:10px" onclick="resetSystem()">RESET SYSTEM</button>
     </div>
 
@@ -307,6 +307,7 @@
         const confidenceDisplay = document.getElementById('confidence-display');
         const previewSnapshot = document.getElementById('preview-snapshot');
         const idCardModal = document.getElementById('id-card-modal');
+        const genBtn = document.getElementById('gen-btn');
 
         let landmarker;
         let running = true;
@@ -552,11 +553,11 @@
                                     Do not include markdown formatting. 
                                     
                                     CRITICAL AGE ESTIMATION RULES:
-                                    1. Prioritize skeletal structure and developmental markers over skin texture. 
-                                    2. For younger subjects, look for neotenous traits: larger eyes relative to face, rounder cheeks, softer jawlines, and shorter mid-face ratios.
-                                    3. Do NOT overestimate age based on baldness, shaved heads, facial hair patterns, or exaggerated expressions (grimacing/squinting).
-                                    4. Ignore lighting shadows that may mimic wrinkles.
-                                    5. If the subject appears to be a child or teenager, be precise with developmental stages.` },
+                                    1. Prioritize skeletal structure (jawline, cheekbones) over temporary facial expressions.
+                                    2. IGNORE "funny faces", scrunching, grimacing, or puffing cheeks. Do not let these distortions make the subject appear like a toddler (9yo) or baby. Look at the eye-to-chin ratio.
+                                    3. For younger subjects (10-18), look for neotenous traits but be precise.
+                                    4. If the face is distorted by expression, lower the confidence score.
+                                    5. Ignore lighting shadows.` },
                                     { type: "image_url", image_url: { url: capturedImageBase64 } }
                                 ]
                             }
@@ -597,13 +598,36 @@
         }
 
         function displayResult(age, notes, confidence) {
-            ageResult.innerText = age;
-            if(notes) {
+            if (confidence < 80) {
+                // FAILURE STATE
+                ageResult.innerText = "FAIL";
+                ageResult.style.color = "var(--secondary)";
+                document.getElementById('age-label').innerText = "SCAN REJECTED";
+                
                 aiNotes.style.display = "block";
-                aiNotes.innerText = "> BIO-NOTES: " + notes.toUpperCase();
-            }
-            if(confidence) {
+                aiNotes.innerText = "> ERROR: LOW CONFIDENCE (" + confidence + "%). PLEASE HOLD STILL, KEEP FACE NEUTRAL, AND ENSURE GOOD LIGHTING.";
+                aiNotes.style.color = "var(--secondary)";
+                
+                confidenceDisplay.innerText = "THRESHOLD REQUIRED: 80%";
+                confidenceDisplay.style.color = "var(--secondary)";
+                
+                genBtn.style.display = "none"; // Hide generate button
+            } else {
+                // SUCCESS STATE
+                ageResult.innerText = age;
+                ageResult.style.color = "#fff";
+                document.getElementById('age-label').innerText = "YEARS DETECTED";
+                
+                if(notes) {
+                    aiNotes.style.display = "block";
+                    aiNotes.innerText = "> BIO-NOTES: " + notes.toUpperCase();
+                    aiNotes.style.color = "var(--primary)";
+                }
+                
                 confidenceDisplay.innerText = "CONFIDENCE: " + confidence + "%";
+                confidenceDisplay.style.color = "var(--primary)";
+                
+                genBtn.style.display = "inline-block"; // Show generate button
             }
             resultScreen.style.display = 'flex';
         }
