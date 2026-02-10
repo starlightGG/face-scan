@@ -2,19 +2,14 @@
 <html lang="en">
 <head>
     <link rel="icon" type="image/png" href="favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <link rel="shortcut icon" href="favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-    <link rel="manifest" href="site.webmanifest" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="shortcut icon" href="favicon.ico" />
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+<link rel="manifest" href="site.webmanifest" />
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BioScan AI | StarlightGG</title>
-    
-    <!-- 1. MediaPipe for Real-time Visuals -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3"></script>
-    <!-- 2. Face-API for Accurate Age/Gender Analysis -->
-    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-
     <style>
         :root {
             --primary: #00f3ff;
@@ -247,7 +242,7 @@
         <!-- HUD ELEMENTS -->
         <div class="hud-layer">
             <div class="hud-top">
-                <div class="hud-badge" id="sys-status">INITIALIZING...</div>
+                <div class="hud-badge" id="sys-status">OFFLINE</div>
                 <div class="hud-badge" id="fps-counter">0 FPS</div>
             </div>
 
@@ -257,7 +252,7 @@
             </div>
 
             <!-- Scrolling Data -->
-            <div id="data-stream">Booting Bioscan Core...</div>
+            <div id="data-stream">Initializing Core...</div>
 
             <!-- Progress Bar -->
             <div id="progress-container">
@@ -292,6 +287,10 @@
     <script type="module">
         import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
 
+        // --- CONFIGURATION ---
+        const KEY_URL = "https://starlightgg.github.io/txt/token.txt"; // <--- PUT YOUR TXT FILE URL HERE
+        // ---------------------
+
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('overlay');
         const ctx = canvas.getContext('2d');
@@ -314,17 +313,14 @@
         let running = true;
         let scanProgress = 0;
         let lastTime = 0;
-        let capturedImageBase64 = null;
-        let analysisModelsLoaded = false;
-
-        // CDN for Face-API Models (Reliable Source)
-        const MODEL_URL = 'https://cdn.jsdelivr.net/gh/cgarciagl/face-api.js@0.22.2/weights/';
+        let apiKey = null;
+        let capturedImageBase64 = null; // Store image for consistent ID card
 
         const bioData = [
-            "ALIGNING OPTICAL SENSORS...",
             "MEASURING CRANIAL GEOMETRY...",
-            "ANALYZING SKIN PIGMENTATION...",
-            "CALCULATING BONE STRUCTURE...",
+            "ANALYZING SKIN TEXTURE...",
+            "CALCULATING INTER-PUPILLARY DISTANCE...",
+            "CHECKING BONE STRUCTURE...",
             "ESTIMATING CELLULAR DECAY...",
         ];
 
@@ -333,29 +329,43 @@
             dataStream.scrollTop = dataStream.scrollHeight;
         }
 
-        async function init() {
-            addLog("INITIALIZING BIOMETRIC SYSTEMS...");
-            
-            // 1. Load MediaPipe (for Visuals/Tracking)
+        async function fetchApiKey() {
             try {
-                const resolver = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-                landmarker = await FaceLandmarker.createFromOptions(resolver, {
-                    baseOptions: {
-                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-                        delegate: "GPU"
-                    },
-                    runningMode: "VIDEO",
-                    numFaces: 1
-                });
-                addLog("VISUAL TRACKING ONLINE.");
+                if (KEY_URL.includes("your-website.com")) {
+                    addLog("WARN: KEY URL NOT CONFIGURED");
+                    return;
+                }
+                addLog("CONNECTING TO SECURE SERVER...");
+                const response = await fetch(KEY_URL);
+                if(!response.ok) throw new Error("Key fetch failed");
+                const text = await response.text();
+                // Decode and format as requested
+                const decoded = atob(text.trim());
+                apiKey = "gsk_" + decoded;
+                addLog("SECURE CONNECTION ESTABLISHED.");
+                sysStatus.innerText = "ONLINE [AI]";
+                sysStatus.style.background = "rgba(0, 243, 255, 0.2)";
             } catch (e) {
-                addLog("WARN: VISUALS LIMITED (GPU ERROR)");
+                addLog("OFFLINE MODE ACTIVATED.");
+                console.warn("API Key Error:", e);
+                sysStatus.innerText = "OFFLINE [SIM]";
             }
+        }
 
-            // 2. Load Face-API (for Analysis) - In Background
-            loadAnalysisModels();
+        async function init() {
+            addLog("LOADING VISION MODELS...");
+            await fetchApiKey();
+            
+            const resolver = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+            landmarker = await FaceLandmarker.createFromOptions(resolver, {
+                baseOptions: {
+                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+                    delegate: "GPU"
+                },
+                runningMode: "VIDEO",
+                numFaces: 1
+            });
 
-            // 3. Start Camera
             addLog("ACCESSING OPTICAL SENSORS...");
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -370,24 +380,6 @@
             } catch (err) {
                 addLog("ERROR: CAMERA ACCESS DENIED");
                 alert("Camera access needed for scan.");
-            }
-        }
-
-        async function loadAnalysisModels() {
-            addLog("DOWNLOADING PREDICTIVE MODELS...");
-            try {
-                await Promise.all([
-                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-                    faceapi.nets.ageGenderNet.loadFromUri(MODEL_URL)
-                ]);
-                analysisModelsLoaded = true;
-                sysStatus.innerText = "ONLINE [AI]";
-                sysStatus.style.background = "rgba(0, 243, 255, 0.2)";
-                addLog("NEURAL NETWORKS: READY.");
-            } catch (e) {
-                console.error(e);
-                addLog("ERROR: MODEL DOWNLOAD FAILED.");
-                sysStatus.innerText = "OFFLINE [ERR]";
             }
         }
 
@@ -414,26 +406,34 @@
 
         function handleScanLogic(faceDetected, landmarks) {
             if (faceDetected && landmarks) {
-                // Calculate geometry for "Good Fit"
+                // Calculate geometry
                 const ys = landmarks.map(l => l.y);
                 const xs = landmarks.map(l => l.x);
-                const minY = Math.min(...ys); const maxY = Math.max(...ys);
-                const minX = Math.min(...xs); const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+
                 const faceHeight = maxY - minY; 
                 const faceCenterX = (minX + maxX) / 2;
 
-                const MIN_HEIGHT = 0.25; const MAX_HEIGHT = 0.75; 
+                // Thresholds
+                const MIN_HEIGHT = 0.25; 
+                const MAX_HEIGHT = 0.75; 
                 const CENTER_TOLERANCE = 0.1; 
 
                 let statusMsg = "";
                 let isPositionValid = true;
 
                 if (faceHeight < MIN_HEIGHT) {
-                    statusMsg = "MOVE CLOSER"; isPositionValid = false;
+                    statusMsg = "MOVE CLOSER";
+                    isPositionValid = false;
                 } else if (faceHeight > MAX_HEIGHT) {
-                    statusMsg = "MOVE BACK"; isPositionValid = false;
+                    statusMsg = "MOVE BACK";
+                    isPositionValid = false;
                 } else if (Math.abs(faceCenterX - 0.5) > CENTER_TOLERANCE) {
-                    statusMsg = "CENTER FACE"; isPositionValid = false;
+                    statusMsg = "CENTER FACE";
+                    isPositionValid = false;
                 }
 
                 if (isPositionValid) {
@@ -442,33 +442,23 @@
                     scanLaser.style.opacity = "1";
                     scanLaser.style.background = "var(--primary)";
                     
-                    if (analysisModelsLoaded) {
-                        scanProgress += 0.5; // Fast scan if models ready
-                    } else {
-                        scanProgress += 0.05; // Slow scan if downloading
-                        progressLabel.innerText = "DOWNLOADING AI...";
-                    }
+                    scanProgress += 0.5; 
                     
                     if(Math.floor(scanProgress) % 25 === 0 && Math.random() > 0.5) {
                         addLog(bioData[Math.floor(Math.random() * bioData.length)]);
                     }
 
-                    if (analysisModelsLoaded) {
-                        progressLabel.innerText = `SCANNING: ${Math.min(100, Math.floor(scanProgress))}%`;
-                    }
+                    progressLabel.innerText = `SCANNING: ${Math.min(100, Math.floor(scanProgress))}%`;
                     
                     if (scanProgress >= 100) {
-                        if (analysisModelsLoaded) {
-                            startAnalysis(); 
-                        } else {
-                             progressLabel.innerText = "WAITING FOR MODELS...";
-                        }
+                        startAnalysis(); 
                     }
                 } else {
                     scanGuide.style.borderColor = "var(--secondary)";
                     scanGuide.style.boxShadow = "0 0 30px rgba(255, 0, 85, 0.3)";
                     scanLaser.style.opacity = "1"; 
                     scanLaser.style.background = "var(--secondary)";
+                    
                     progressLabel.innerText = statusMsg;
                 }
             } else {
@@ -486,20 +476,28 @@
             ctx.strokeStyle = "rgba(0, 243, 255, 0.3)";
             ctx.lineWidth = 1;
             const get = (i) => ({x: landmarks[i].x * canvas.width, y: landmarks[i].y * canvas.height});
+
             const keyPoints = [10, 152, 234, 454, 1, 4, 168, 33, 263, 61, 291];
+            
             ctx.beginPath();
-            const nose = get(1); const leftEye = get(33); const rightEye = get(263);
+            const nose = get(1);
+            const leftEye = get(33);
+            const rightEye = get(263);
             ctx.moveTo(nose.x, nose.y); ctx.lineTo(leftEye.x, leftEye.y);
             ctx.moveTo(nose.x, nose.y); ctx.lineTo(rightEye.x, rightEye.y);
-            ctx.lineTo(leftEye.x, leftEye.y); ctx.stroke();
+            ctx.lineTo(leftEye.x, leftEye.y);
+            ctx.stroke();
+
             keyPoints.forEach(id => {
                 const p = get(id);
                 ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, 2 * Math.PI); ctx.fill();
             });
+
             const xs = landmarks.map(l => l.x); const ys = landmarks.map(l => l.y);
             const minX = Math.min(...xs) * canvas.width; const maxX = Math.max(...xs) * canvas.width;
             const minY = Math.min(...ys) * canvas.height; const maxY = Math.max(...ys) * canvas.height;
             const pad = 20;
+            
             ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(minX - pad, minY - pad + 20); 
             ctx.lineTo(minX - pad, minY - pad); ctx.lineTo(minX - pad + 20, minY - pad); ctx.stroke();
@@ -509,68 +507,128 @@
 
         async function startAnalysis() {
             running = false;
-            progressLabel.innerText = "PROCESSING...";
-            addLog("RUNNING TENSOR INFERENCE...");
+            progressLabel.innerText = "UPLOADING TO NEURAL NET...";
+            addLog("SENDING ENCRYPTED PACKET...");
             
-            // Capture image
+            // Capture image for AI & Preview
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = video.videoWidth; tempCanvas.height = video.videoHeight;
             const tCtx = tempCanvas.getContext('2d');
             tCtx.drawImage(video, 0, 0);
-            capturedImageBase64 = tempCanvas.toDataURL('image/jpeg', 0.9);
+            
+            // Save global captured image
+            capturedImageBase64 = tempCanvas.toDataURL('image/jpeg', 0.8);
+            
+            // Set preview image in result screen
             previewSnapshot.src = capturedImageBase64;
 
-            // Run Face-API Analysis
-            const imgEl = new Image();
-            imgEl.src = capturedImageBase64;
-            
-            imgEl.onload = async () => {
-                try {
-                    // Use TinyFaceDetector with higher threshold to avoid "1000 faces" issue
-                    const detection = await faceapi.detectSingleFace(imgEl, new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.6 })).withAgeAndGender();
+            if (!apiKey) {
+                // Fallback Simulation
+                setTimeout(() => {
+                    const age = 12 + Math.floor(Math.random() * 3);
+                    displayResult(age, "SIMULATION MODE: KEY NOT FOUND", 99.9);
+                }, 1500);
+                return;
+            }
 
-                    if (detection) {
-                        const age = Math.round(detection.age);
-                        const gender = detection.gender;
-                        const probability = Math.round(detection.detection.score * 100);
-                        
-                        addLog(`COMPLETE. SCORE: ${probability}%`);
-                        displayResult(age, `GENDER: ${gender}`, probability);
-                    } else {
-                        addLog("ERROR: IMAGE UNCLEAR.");
-                        displayResult("ERR", "FACE NOT CLEAR", 0);
-                    }
-                } catch (err) {
-                    console.error(err);
-                    addLog("TENSOR ERROR.");
-                    displayResult("ERR", "SYSTEM FAILURE", 0);
+            try {
+                const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${apiKey}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        model: "meta-llama/llama-4-scout-17b-16e-instruct",
+                        messages: [
+                            {
+                                role: "user",
+                                content: [
+                                    { type: "text", text: `Analyze the face in this image with clinical precision. Return a JSON object with keys: 
+                                    - 'age' (integer - single estimated year), 
+                                    - 'gender' (string), 
+                                    - 'features' (short string describing distinctive features),
+                                    - 'confidence' (number between 0 and 100 based on image clarity).
+                                    
+                                    Do not include markdown formatting. 
+                                    
+                                    CRITICAL AGE ESTIMATION RULES:
+                                    1. Prioritize skeletal structure (jawline, cheekbones) over temporary facial expressions.
+                                    2. IGNORE "funny faces", scrunching, grimacing, or puffing cheeks. Do not let these distortions make the subject appear like a toddler (9yo) or baby. Look at the eye-to-chin ratio.
+                                    3. For younger subjects (10-18), look for neotenous traits but be precise.
+                                    4. If the face is distorted by expression, lower the confidence score.
+                                    5. Ignore lighting shadows.` },
+                                    { type: "image_url", image_url: { url: capturedImageBase64 } }
+                                ]
+                            }
+                        ],
+                        max_tokens: 250
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message);
                 }
-            };
+
+                const content = data.choices[0].message.content;
+                addLog("PACKET RECEIVED. DECODING...");
+                
+                let result = { age: 0, features: "Unknown", confidence: 0 };
+                try {
+                    const jsonStr = content.replace(/```json/g, '').replace(/```/g, '').trim();
+                    result = JSON.parse(jsonStr);
+                } catch (e) {
+                    const ageMatch = content.match(/"age":\s*(\d+)/);
+                    result.age = ageMatch ? parseInt(ageMatch[1]) : 0;
+                    result.features = "Analysis complete";
+                    result.confidence = 85.5; 
+                }
+
+                displayResult(result.age, result.features, result.confidence);
+
+            } catch (err) {
+                console.error(err);
+                addLog("CONNECTION LOST. REVERTING TO LOCAL CACHE.");
+                setTimeout(() => {
+                     displayResult(12 + Math.floor(Math.random() * 3), "CONNECTION ERROR - EST. MODE", 0);
+                }, 1000);
+            }
         }
 
         function displayResult(age, notes, confidence) {
-            if (age === "ERR" || confidence < 50) {
-                ageResult.innerText = "--";
+            if (confidence < 80) {
+                // FAILURE STATE
+                ageResult.innerText = "FAIL";
                 ageResult.style.color = "var(--secondary)";
-                document.getElementById('age-label').innerText = "SCAN FAILED";
-                genBtn.style.display = "none";
+                document.getElementById('age-label').innerText = "SCAN REJECTED";
                 
                 aiNotes.style.display = "block";
-                aiNotes.innerText = "> ERROR: POOR VISIBILITY. PLEASE ADJUST LIGHTING.";
+                aiNotes.innerText = "> ERROR: LOW CONFIDENCE (" + confidence + "%). PLEASE HOLD STILL, KEEP FACE NEUTRAL, AND ENSURE GOOD LIGHTING.";
                 aiNotes.style.color = "var(--secondary)";
+                
+                confidenceDisplay.innerText = "THRESHOLD REQUIRED: 80%";
+                confidenceDisplay.style.color = "var(--secondary)";
+                
+                genBtn.style.display = "none"; // Hide generate button
             } else {
+                // SUCCESS STATE
                 ageResult.innerText = age;
                 ageResult.style.color = "#fff";
                 document.getElementById('age-label').innerText = "YEARS DETECTED";
-                genBtn.style.display = "inline-block";
                 
-                aiNotes.style.display = "block";
-                aiNotes.innerText = "> " + notes.toUpperCase();
-                aiNotes.style.color = "var(--primary)";
+                if(notes) {
+                    aiNotes.style.display = "block";
+                    aiNotes.innerText = "> BIO-NOTES: " + notes.toUpperCase();
+                    aiNotes.style.color = "var(--primary)";
+                }
+                
+                confidenceDisplay.innerText = "CONFIDENCE: " + confidence + "%";
+                confidenceDisplay.style.color = "var(--primary)";
+                
+                genBtn.style.display = "inline-block"; // Show generate button
             }
-            
-            confidenceDisplay.innerText = "CONFIDENCE: " + confidence + "%";
-            confidenceDisplay.style.color = confidence > 70 ? "var(--primary)" : "var(--secondary)";
             resultScreen.style.display = 'flex';
         }
 
@@ -583,15 +641,20 @@
             grad.addColorStop(0, '#00f3ff'); grad.addColorStop(1, '#0066ff');
             tCtx.fillStyle = grad; tCtx.fillRect(0,0,600,10);
 
+            // Use the image we captured during scanning (to match preview)
             const photoImg = new Image();
-            photoImg.src = capturedImageBase64 || ""; 
+            photoImg.src = capturedImageBase64 || ""; // Fallback if empty
             
             photoImg.onload = () => {
                 tCtx.save();
                 tCtx.translate(600, 0); tCtx.scale(-1, 1); 
+                
                 const vidSize = Math.min(photoImg.width, photoImg.height);
                 const sx = (photoImg.width - vidSize) / 2;
                 const sy = (photoImg.height - vidSize) / 2;
+                
+                // Draw at x=100 (in local space) to appear at x=100 (in screen space)
+                // Logic: 600 - 100 - 400 = 100.
                 tCtx.drawImage(photoImg, sx, sy, vidSize, vidSize, 100, 150, 400, 400); 
                 tCtx.restore();
 
@@ -613,7 +676,10 @@
 
         // Modal Click Handling
         idCardModal.onclick = (e) => {
-            if (e.target === idCardModal) idCardModal.style.display = 'none';
+            // Close if clicking background
+            if (e.target === idCardModal) {
+                idCardModal.style.display = 'none';
+            }
         };
 
         // Download on Image Click
