@@ -544,20 +544,41 @@
                             {
                                 role: "user",
                                 content: [
-                                    { type: "text", text: `Analyze the face in the provided image with clinical precision. Return only a JSON object with the following keys:
-- 'age' (integer - single estimated year), 
-- 'gender' (string), 
-- 'features' (short string describing distinctive features),
-- 'confidence' (number between 0 and 100 based on image clarity).
+                                    { type: "text", text: `SYSTEM_ROLE: Clinical Biometric Analyst / Forensic Anthropologist.
+TASK: Execute a high-fidelity craniofacial analysis on the provided image to determine biological age and gender with 99% target accuracy.
 
-CRITICAL AGE ESTIMATION RULES:
-1. SKELETAL PRIORITY: Prioritize bone structure (jawline, zygomatic arch, and mandibular angle) over temporary skin movement or facial expressions.
-2. EXPRESSION FILTERING: Strictly ignore "funny faces," scrunching, grimacing, or puffing cheeks. Do not allow these distortions to cause a "toddler" or "baby" misidentification. Analyze the eye-to-chin ratio and the positioning of the eyes relative to the total cranial height.
-3. ADOLESCENT PRECISION: For subjects aged 10-18, identify neotenous traits vs. emerging adult skeletal markers (e.g., supraorbital ridge development).
-4. CONFIDENCE SCORING: If the face is significantly distorted by expression or if artifacts (like sensor noise or motion blur) obscure skeletal markers, lower the confidence score accordingly.
-5. SHADOW SUPPRESSION: Ignore lighting shadows and differentiate them from true anatomic hollows.
+[1. SKELETAL BIOMETRIC CONSTANTS]
+- MANDIBULAR ANGLE: Calculate the angle of the jawline relative to the Frankfort horizontal plane. Ignore soft tissue/puffing.
+- EYE-TO-CHIN RATIO: Calculate the vertical distance from the medial canthus to the gnathion. Compare this against the total vertical height of the cranium.
+- BIZYGOMATIC WIDTH: Measure the width across the cheekbones. In subjects under 14, this width is narrow relative to the skull; in adults, it widens.
+- ORBITAL POSITIONING: Identify the vertical placement of the eyes. Lower placement (below the cranial midpoint) is a definitive marker for pre-adolescence regardless of facial expression.
 
-Constraint: Return the JSON object as raw text. Do not include markdown formatting, backticks, or additional prose.
+[2. EXPRESSION DISTORTION MITIGATION]
+- If Action Unit 6 (Cheek Raiser) or Action Unit 12 (Lip Corner Puller) is active (smiling/grimacing), the system MUST switch to "Skeletal-Only Mode."
+- Ignore nasolabial folds or skin bunching caused by the expression. 
+- Use the distance between the pupils (Interpupillary distance) as a fixed scale to calibrate all other measurements.
+
+[3. DERMATOLOGICAL & LIGHTING LOGIC]
+- SHADOW ANALYSIS: Differentiate between drop shadows (caused by external light) and anatomical shadows (caused by bone structure like the supraorbital ridge).
+- SKIN TEXTURE: Scan for collagen density markers. Differentiate between "motion blur/noise" and "ephemeral skin texture." 
+- For vintage/low-res sensors: Apply an internal de-noising logic pass to ensure sensor artifacts are not misidentified as facial features.
+
+[4. COMPUTATIONAL STEP-BY-STEP]
+1. IDENTIFY: Locate the 68 standard facial landmarks.
+2. CALIBRATE: Use the eye-to-eye distance as a 1:1 scale.
+3. MEASURE: Calculate the Eye-to-Chin vs. Total Cranial Height ratio.
+4. FILTER: Subtract all "soft tissue" changes caused by facial expressions.
+5. ESTIMATE: Assign age based on bone development charts (Forensic standard).
+
+[5. OUTPUT FORMAT]
+Return ONLY a raw JSON object. No prose. No markdown. No backticks.
+{
+  "age": [integer],
+  "gender": [string],
+  "features": [precise forensic description],
+  "confidence": [number 0-100 based on skeletal visibility]
+}
+
 ` },
                                     { type: "image_url", image_url: { url: capturedImageBase64 } }
                                 ]
