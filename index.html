@@ -544,20 +544,21 @@
                             {
                                 role: "user",
                                 content: [
-                                    { type: "text", text: `Analyze the face in this image with clinical precision. Return a JSON object with keys: 
-                                    - 'age' (integer - single estimated year), 
-                                    - 'gender' (string), 
-                                    - 'features' (short string describing distinctive features),
-                                    - 'confidence' (number between 0 and 100 based on image clarity).
-                                    
-                                    Do not include markdown formatting. 
-                                    
-                                    CRITICAL AGE ESTIMATION RULES:
-                                    1. Prioritize skeletal structure (jawline, cheekbones) over temporary facial expressions.
-                                    2. IGNORE "funny faces", scrunching, grimacing, or puffing cheeks. Do not let these distortions make the subject appear like a toddler (9yo) or baby. Look at the eye-to-chin ratio.
-                                    3. For younger subjects (10-18), look for neotenous traits but be precise.
-                                    4. If the face is distorted by expression, lower the confidence score.
-                                    5. Ignore lighting shadows.` },
+                                    { type: "text", text: `Analyze the face in the provided image with clinical precision. Return only a JSON object with the following keys:
+- 'age' (integer - single estimated year), 
+- 'gender' (string), 
+- 'features' (short string describing distinctive features),
+- 'confidence' (number between 0 and 100 based on image clarity).
+
+CRITICAL AGE ESTIMATION RULES:
+1. SKELETAL PRIORITY: Prioritize bone structure (jawline, zygomatic arch, and mandibular angle) over temporary skin movement or facial expressions.
+2. EXPRESSION FILTERING: Strictly ignore "funny faces," scrunching, grimacing, or puffing cheeks. Do not allow these distortions to cause a "toddler" or "baby" misidentification. Analyze the eye-to-chin ratio and the positioning of the eyes relative to the total cranial height.
+3. ADOLESCENT PRECISION: For subjects aged 10-18, identify neotenous traits vs. emerging adult skeletal markers (e.g., supraorbital ridge development).
+4. CONFIDENCE SCORING: If the face is significantly distorted by expression or if artifacts (like sensor noise or motion blur) obscure skeletal markers, lower the confidence score accordingly.
+5. SHADOW SUPPRESSION: Ignore lighting shadows and differentiate them from true anatomic hollows.
+
+Constraint: Return the JSON object as raw text. Do not include markdown formatting, backticks, or additional prose.
+` },
                                     { type: "image_url", image_url: { url: capturedImageBase64 } }
                                 ]
                             }
